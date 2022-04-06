@@ -3,7 +3,7 @@ import json
 from django.core.mail import send_mail
 from django.http import HttpResponse
 from django.shortcuts import render
-from .tasks import test_function
+from .tasks import test_function, print_akshay
 from send_mail_app.tasks import send_mail_function
 from django_celery_project import settings
 from django_celery_beat.models import PeriodicTask, CrontabSchedule
@@ -45,3 +45,8 @@ def get_periodic_tasks(request):
     for task in tasks:
         print(task)
     return HttpResponse("Thank you..")
+
+
+def print_name_akshay(request):
+    print_akshay.delay()
+    return HttpResponse("Akshay Done")
