@@ -1,0 +1,173 @@
+
+Celery Steps
+
+    • Create project
+    • Installation of
+        ◦ celery
+        ◦ redis
+        django-celery-beat
+    • Add celery settings in settings.py like
+          CELERY_BROKER_URL = 'redis://127.0.0.1:6379'
+          CELERY_ACCEPT_CONTENT = ['application/json']
+          CELERY_RESULT_SERIALIZER = 'json'
+          CELERY_TASK_SERIALIZER = 'json'
+          CELERY_TIMEZONE = 'Asia/Kolkata'
+          CELERY_RESULT_BACKEND = 'django-db'
+    • Run redis server
+    • Create celery.py file project folder.
+----------------------------------------------------
+import os
+from celery import Celery
+from django.conf import settings
+from celery.schedules import crontab
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'django_celery_project.settings')
+app = Celery('django_celery_project')
+app.conf.enable_utc = False
+app.conf.update(timezone='Asia/kolkata')
+app.config_from_object(settings, namespace='CELERY')
+
+
+# Celery beat settings
+app.conf.beat_schedule = {
+    'send_mail_at_our_time': {
+        'task': 'send_mail_app.tasks.send_mail_function',  # app_name.file_name.function_name
+        'schedule': crontab(hour=18, minute=10),
+        # 'args': (2,3) --- the given argument we can use in send_mail_function
+    }
+}
+
+
+app.autodiscover_tasks()
+
+@app.task(bind=True)
+def debug_task(self):
+    print(f'Request : {self.request!r}')
+
+------------------------------------------------------------------------------------
+
+    • Create a app and create a tasks.py file, then add functions that you want to run in background.
+
+-------------------------------------------
+from celery import shared_task
+
+
+@shared_task(bind=True)
+def test_function(self):
+    # operations
+    for i in range(5):
+        print(i)
+    return "Done"
+
+-----------------------------------------------------
+
+
+
+
+
+    • Go to views.py and create functions/APIs and call the function by .delay() function.
+--------------------------------------------------------
+def test(request):
+    test_function.delay()
+    return HttpResponse("Done")
+---------------------------------------------------
+
+    • Then add Urls and run the server and worker
+
+
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+
+Celery workers working.
+
+DJANGO  >>(tasks)>>  Messsage brokers (Redis, Heroku, etc)  >>(task for to execute)>>  Workers  >>(events)>>  DB
+
+
+
+What is Celery :- to run asynchronous task
+
+Celery workers :- tasks run in the background through the celery workers.
+		Workers running to execute set of tasks.
+
+
+Base & Basic Setups
+
+    • Create a celery.py file in project folder and add the required settings.
+    • Then modify the __init__.py file in project folder.
+    • Add required datas in settings.py (BROKER_URL, SERIIALIZER, etc)
+    •
+
+
+Run a Celery worker
+>>> celery -A (project_name).celery worker –loglevel=info
+
+Run celery Beat
+>>> celery -A (project_name).celery beat –loglevel=info
+
+
+Run Multiple celery worker
+>>> celery -A django_celery_project worker -l info --concurrency=4 -n wkr2@redis://127.0.0.1:6379
+-- celery -A project_name worker -l info --concurrency=4 -n (worker_name)(broker_url)
+
+
+
+
+
+
+How to add multiple workers
+    • celery -A django_celery_project worker -l info --concurrency=4 -n wkr2@redis://127.0.0.1:6379
+        ◦ celery -A PROJECTNAME.celery worker -l info --concurrency=2 -n wkr2@BROKER_URL
+    • but i cant assign specific workers for specific tasks. auto
+
+
+Use of multiple workers
+    • speed aakkam... multiple workers undel oroo workers oro tasks edukum, then athu backgoundil run aavum... so speed aavum.
+
+
+How to retrieve data
+    • Using normal method. Passing required arguments when calling delay() function.
+
+
+
+
+Celery workers :- Findings
+
+    • We can run Multiple workers using the following commands.
+
+ Terminal1 >> celery -A django_celery_project worker -l info --concurrency=2 -n worker1@127.0.0.1:637 Terminal2 >> celery -A django_celery_project worker -l info --concurrency=2 -n worker2@127.0.0.1:6379
+ Terminal3 >> celery -A django_celery_project worker -l info --concurrency=2 -n worker2@127.0.0.1:6379
+
+    • We can set a queue for a specific task like this..
+
+Add the following configurations in the celery.py file.
+
+app.conf.task_routers = {
+ 'send_mail_app.tasks.send_mail_function': {
+ 'queue': 'queue1'
+ 'mainapp.tasks.test_function': {
+ 'queue': 'queue2'
+ }
+}
+
+ And run the worker by mentioning the queue name. Like this,
+
+ Terminal1 >> celery -A django_celery_project worker -l info --concurrency=4 -n worker2@127.0.0.1:6379 -Q queue1
+
+ Terminal2 >> celery -A django_celery_project worker -l info --concurrency=4 -n worker2@127.0.0.1:6379 -Q queue2
+
+
+Note :-
+But it didn't work for me. I followed some stackoverflow documentation. But it didn't work.
+The task runs with the default worker.
+
+    • Then I tried another method.
+
+Added the task router into the settings.py fil  CELERY_TASK_ROUTES = {
+ 'send_mail_app.tasks.send_mail_function’ : {
+ 'queue': 'queue1'
+ },
+'mainapp.tasks.test_function': {
+ 'queue': 'queue2'  },
+  }
+
+ I got a success result when I used CELERY_TASK_ROUTES in the settings.py file.
